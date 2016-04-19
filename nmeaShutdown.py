@@ -3,30 +3,46 @@ import platform
 import serial
 import serial.tools.list_ports
 
+# Global variables
+ver = serial.VERSION
+
 # Write to port
 def portWrite(port, str):
     port.write(str)
-    while port.outWaiting() != 0:
-        pass
+    if '2.7' in ver:
+        while port.outWaiting() != 0:
+            pass
+    elif '3.0' in ver:
+        while port.out_waiting != 0:
+            pass
 
 # Main function
 def main():
+    # Declare global variables
+    global ver
+    
     # Get OS platform
     sys = platform.system()
     
     # Get COM ports
-    print 'Searching for device...'
+    print 'Searching for devices...'
     coms = []
     ports = list(serial.tools.list_ports.comports())
     for p in ports:
-        if sys == 'Windows':
-            if 'VID_0403+PID_6015' in p[2]:
-                com = p[0]
-                coms.append(com)
-                print 'Device found on {}'.format(com)
-        elif sys == 'Linux':
-            if 'VID:PID=0403:6015' in p[2]:
-                com = p[0]
+        if '2.7' in ver:
+            if sys == 'Windows':
+                if 'VID_0403+PID_6015' in p[2]:
+                    com = p[0]
+                    coms.append(com)
+                    print 'Device found on {}'.format(com)
+            elif sys == 'Linux':
+                if 'VID:PID=0403:6015' in p[2]:
+                    com = p[0]
+                    coms.append(com)
+                    print 'Device found on {}'.format(com)
+        elif '3.0' in ver:
+            if 'VID:PID=0403:6015' in p.hwid:
+                com = p.device
                 coms.append(com)
                 print 'Device found on {}'.format(com)
     if not coms:
