@@ -27,6 +27,8 @@ def main():
     f.write('Channel,Satellite,GPS Time,Pseudorange,Carrier Frequency,'
             'Carrier Phase,CNR 1,CNR 2,CNR 3,CNR 4,CNR 5,CNR 6,CNR 7,CNR 8,'
             'CNR 9,CNR 10\r\n')
+    # fclk = open('clock_' + args.file + '.csv', 'wb')
+    # fclk.write('GPS Week,ToW,SVs,Clock Drift,Clock Bias,Est. GPS Time\r\n')
     for line in data:
         str = line.strip().replace(' ', '')
         if str[6:8] == '38' and str[8:10] == '1c' and len(str) == 128:
@@ -46,7 +48,15 @@ def main():
             f.write('{},'.format(int(str[98:100], 16)))
             f.write('{},'.format(int(str[100:102], 16)))
             f.write('{}\r\n'.format(int(str[102:104], 16)))
+        # if str[6:8] == '14' and str[8:10] == '07' and len(str) == 56:
+            # fclk.write('{},'.format(int(str[10:14], 16)))
+            # fclk.write('{},'.format(int(str[14:22], 16)))
+            # fclk.write('{},'.format(int(str[22:24], 16)))
+            # fclk.write('{},'.format(int(str[24:32], 16)))
+            # fclk.write('{},'.format(int(str[32:40], 16)))
+            # fclk.write('{}\r\n'.format(int(str[40:48], 16)))
     f.close()
+    # fclk.close()
     data.close()
 
 if __name__ == '__main__':
