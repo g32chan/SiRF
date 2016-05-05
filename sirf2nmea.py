@@ -58,10 +58,10 @@ def main():
         p.flushOutput()
         ports.append(p)
     
-    # Shut down chip
-    print 'Shutting down devices...'
+    # Switch to NMEA mode
+    print 'Switching to NMEA mode...'
     for p in ports:
-        portWrite(p, 'A0A20002CD1000DDB0B3')
+        portWrite(p, 'A0A20018810201010001010105010101000100010001000100012580013AB0B3')
     
     # Close ports
     for p in ports:

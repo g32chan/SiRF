@@ -1,5 +1,4 @@
 # Imported Libraries
-import binascii
 import platform
 import serial
 import serial.tools.list_ports
@@ -9,7 +8,7 @@ ver = serial.VERSION
 
 # Write to port
 def portWrite(port, str):
-    port.write(binascii.unhexlify(str))
+    port.write(str)
     if '2.7' in ver:
         while port.outWaiting() != 0:
             pass
@@ -53,15 +52,15 @@ def main():
     # Open COM ports
     ports = []
     for c in coms:
-        p = serial.Serial(c, baudrate = 115200)
+        p = serial.Serial(c)
         p.flushInput()
         p.flushOutput()
         ports.append(p)
     
-    # Shut down chip
-    print 'Shutting down devices...'
+    # Switch to SiRF mode
+    print 'Switching to SiRF mode...'
     for p in ports:
-        portWrite(p, 'A0A20002CD1000DDB0B3')
+        portWrite(p, '$PSRF100,0,115200,8,1,0*04\r\n')
     
     # Close ports
     for p in ports:
