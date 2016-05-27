@@ -7,24 +7,25 @@ import serial.tools.list_ports
 import time
 
 # Global variables
-sirf = False
+# sirf = False
 ver = serial.VERSION
 
 # Write to port
-def portWrite(port, str):
+def portWrite(port, str, sirf):
     if sirf:
         port.write(binascii.unhexlify(str))
     else:
         port.write(str)
-    if '2.7' in ver:
-        while port.outWaiting() != 0:
-            pass
-    elif '3.0' in ver:
-        while port.out_waiting != 0:
-            pass
+    port.flush()
+    # if '2.7' in ver:
+        # while port.outWaiting() != 0:
+            # pass
+    # elif '3.0' in ver:
+        # while port.out_waiting != 0:
+            # pass
 
 # Read from port
-def portRead(port):
+def portRead(port, sirf):
     if '2.7' in ver:
         while port.inWaiting() == 0:
             pass
@@ -41,13 +42,17 @@ def changeBaud(port, rate):
     port.close()
     port.baudrate = rate
     port.open()
-    port.flushInput()
-    port.flushOutput()
+    if '2.7' in ver:
+        port.flushInput()
+        port.flushOutput()
+    elif '3.0' in ver:
+        port.reset_input_buffer()
+        port.reset_output_buffer()
 
 # Main function
 def main():
     # Declare global variables
-    global sirf
+    # global sirf
     global ver
     
     # Get OS platform
@@ -74,6 +79,9 @@ def main():
                 com = p.device
                 coms.append(com)
                 print 'Device found on {}'.format(com)
+        else:
+            print 'PySerial version unrecognized'
+            return
     if not coms:
         print 'No devices found'
         return
@@ -93,8 +101,12 @@ def main():
     ports = []
     for c in coms:
         p = serial.Serial(c)
-        p.flushInput()
-        p.flushOutput()
+        if '2.7' in ver:
+            p.flushInput()
+            p.flushOutput()
+        elif '3.0' in ver:
+            p.reset_input_buffer()
+            p.reset_output_buffer()
         ports.append(p)
     if len(ports) != len(files):
         print 'Error: Lengths do not match'
@@ -103,7 +115,7 @@ def main():
     # Initialize SiRF mode
     print 'Switching to SiRF mode...'
     for p in ports:
-        sirf = False
+        # sirf = False
         
         # # Check current mode
         # prev = ''
@@ -118,13 +130,13 @@ def main():
                 # break
         
         # if not sirf:
-        portWrite(p, '$PSRF100,0,115200,8,1,0*04\r\n')
+        portWrite(p, '$PSRF100,0,115200,8,1,0*04\r\n', False)
         changeBaud(p, 115200)
-        sirf = True
+        # sirf = True
         # portWrite(p, 'A0A2001980000000000000000000000000000000000000000000000C1800A4B0B3') # Enable nav data
         # portWrite(p, 'A0A20002DA0000DAB0B3')    # Full power mode
         # portWrite(p, 'A0A20008A6001C010000000000C3B0B3')    # Enable MID 28
-        portWrite(p, 'A0A20008A6051C010000000000C8B0B3')    # Enable MID 28
+        portWrite(p, 'A0A20008A6051C010000000000C8B0B3', True)    # Enable MID 28
     
     # # Write data to file
     # k = 1048576 # 1 MB
@@ -140,7 +152,7 @@ def main():
     # print 'Reading {} bytes...'.format(k)
     # prev = ''
     # x = 10
-    t = 30
+    t = 10
     print 'Reading for {} seconds...'.format(t)
     startTime = time.time()
     # timeRequest = startTime
@@ -149,14 +161,14 @@ def main():
     while timeElapsed < t:
     # while k:
         for i in range(len(ports)):
-            if sirf:
+            # if sirf:
                 # Find start of message
                 while os.stat(files[i].name).st_size == 0:
-                    data = portRead(ports[i])
+                    data = portRead(ports[i], True)
                     if data != 'a0':
                         continue
                     prev = data
-                    data = portRead(ports[i])
+                    data = portRead(ports[i], True)
                     if data != 'a2':
                         continue
                     files[i].write(prev + ' ' + data + ' ')
@@ -164,21 +176,21 @@ def main():
                     os.fsync(files[i])
                     break
                 
-                data = portRead(ports[i])
+                data = portRead(ports[i], True)
                 files[i].write(data + ' ')
                 
                 # Find end of message
                 while data == 'b0':
-                    data = portRead(ports[i])
+                    data = portRead(ports[i], True)
                     files[i].write(data + ' ')
                     if data != 'b3':
                         continue
-                    data = portRead(ports[i])
+                    data = portRead(ports[i], True)
                     if data == 'a0':
                         files[i].write('\r\n')
                     files[i].write(data + ' ')
-            else:
-                files[i].write(portRead(ports[i]))
+            # else:
+                # files[i].write(portRead(ports[i]))
         
         # Update timers
         timeElapsed = time.time() - startTime
@@ -202,10 +214,10 @@ def main():
     # Switch back to NMEA
     print 'Reverting to NMEA mode...'
     for p in ports:
-        sirf = True
-        portWrite(p, 'A0A20018810201010001010105010101000100010001000100012580013AB0B3')
+        # sirf = True
+        portWrite(p, 'A0A20018810201010001010105010101000100010001000100012580013AB0B3', True)
         changeBaud(p, 9600)
-        sirf = False
+        # sirf = False
     
     # # Shut down chip
     # print 'Shutting down devices...'

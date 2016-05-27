@@ -9,12 +9,13 @@ ver = serial.VERSION
 # Write to port
 def portWrite(port, str):
     port.write(str)
-    if '2.7' in ver:
-        while port.outWaiting() != 0:
-            pass
-    elif '3.0' in ver:
-        while port.out_waiting != 0:
-            pass
+    port.flush()
+    # if '2.7' in ver:
+        # while port.outWaiting() != 0:
+            # pass
+    # elif '3.0' in ver:
+        # while port.out_waiting != 0:
+            # pass
 
 # Main function
 def main():
@@ -53,8 +54,12 @@ def main():
     ports = []
     for c in coms:
         p = serial.Serial(c)
-        p.flushInput()
-        p.flushOutput()
+        if '2.7' in ver:
+            p.flushInput()
+            p.flushOutput()
+        elif '3.0' in ver:
+            p.reset_input_buffer()
+            p.reset_output_buffer()
         ports.append(p)
     
     # Shut down chip
