@@ -4,6 +4,7 @@ import os
 import platform
 import serial
 import serial.tools.list_ports
+import subprocess as sp
 import time
 
 # Global variables
@@ -24,18 +25,18 @@ def portWrite(port, str, sirf):
         # while port.out_waiting != 0:
             # pass
 
-# Read from port
-def portRead(port, sirf):
-    if '2.7' in ver:
-        while port.inWaiting() == 0:
-            pass
-    elif '3.0' in ver:
-        while port.in_waiting == 0:
-            pass
-    if sirf:
-        return format(int(binascii.hexlify(port.read()), 16), '02x')
-    else:
-        return port.read()
+# # Read from port
+# def portRead(port, sirf):
+    # if '2.7' in ver:
+        # while port.inWaiting() == 0:
+            # pass
+    # elif '3.0' in ver:
+        # while port.in_waiting == 0:
+            # pass
+    # if sirf:
+        # return format(int(binascii.hexlify(port.read()), 16), '02x')
+    # else:
+        # return port.read()
 
 # Change baud rate function
 def changeBaud(port, rate):
@@ -96,6 +97,7 @@ def main():
             fileName = '{}_{}.dat'.format(curTime, c.split('/')[2])
         f = open(fileName, 'ab')
         files.append(f)
+        f.close()
     
     # Open COM ports
     ports = []
@@ -136,9 +138,10 @@ def main():
         # portWrite(p, 'A0A2001980000000000000000000000000000000000000000000000C1800A4B0B3') # Enable nav data
         # portWrite(p, 'A0A20002DA0000DAB0B3')    # Full power mode
         # portWrite(p, 'A0A20008A6001C010000000000C3B0B3')    # Enable MID 28
-        portWrite(p, 'A0A20008A6051C010000000000C8B0B3', True)    # Enable MID 28
+        portWrite(p, 'A0A20008A6051C010000000000C8B0B3', True) # Enable MID 28
+        p.close()
     
-    # # Write data to file
+    # Write data to file
     # k = 1048576 # 1 MB
     # k = 512000  # 500 KB
     # k = 102400  # 100 KB
@@ -152,49 +155,54 @@ def main():
     # print 'Reading {} bytes...'.format(k)
     # prev = ''
     # x = 10
-    t = 10
+    sub = []
+    t = 60
     print 'Reading for {} seconds...'.format(t)
     startTime = time.time()
     # timeRequest = startTime
-    timeElapsed = 0
+    # timeElapsed = 0
     # timer = 0
-    while timeElapsed < t:
+    # while timeElapsed < t:
     # while k:
-        for i in range(len(ports)):
-            # if sirf:
-                # Find start of message
-                while os.stat(files[i].name).st_size == 0:
-                    data = portRead(ports[i], True)
-                    if data != 'a0':
-                        continue
-                    prev = data
-                    data = portRead(ports[i], True)
-                    if data != 'a2':
-                        continue
-                    files[i].write(prev + ' ' + data + ' ')
-                    files[i].flush()
-                    os.fsync(files[i])
-                    break
+    for i in range(len(ports)):
+        s = sp.Popen('python readCOM.py ' + files[i].name + ' ' + str(t), stdout = sp.PIPE, stderr = sp.PIPE)
+        sub.append(s)
+    for s in sub:
+        s.wait()
+            # # if sirf:
+                # # Find start of message
+                # while os.stat(files[i].name).st_size == 0:
+                    # data = portRead(ports[i], True)
+                    # if data != 'a0':
+                        # continue
+                    # prev = data
+                    # data = portRead(ports[i], True)
+                    # if data != 'a2':
+                        # continue
+                    # files[i].write(prev + ' ' + data + ' ')
+                    # files[i].flush()
+                    # os.fsync(files[i])
+                    # break
                 
-                data = portRead(ports[i], True)
-                files[i].write(data + ' ')
+                # data = portRead(ports[i], True)
+                # files[i].write(data + ' ')
                 
-                # Find end of message
-                while data == 'b0':
-                    data = portRead(ports[i], True)
-                    files[i].write(data + ' ')
-                    if data != 'b3':
-                        continue
-                    data = portRead(ports[i], True)
-                    if data == 'a0':
-                        files[i].write('\r\n')
-                    files[i].write(data + ' ')
-            # else:
-                # files[i].write(portRead(ports[i]))
+                # # Find end of message
+                # while data == 'b0':
+                    # data = portRead(ports[i], True)
+                    # files[i].write(data + ' ')
+                    # if data != 'b3':
+                        # continue
+                    # data = portRead(ports[i], True)
+                    # if data == 'a0':
+                        # files[i].write('\r\n')
+                    # files[i].write(data + ' ')
+            # # else:
+                # # files[i].write(portRead(ports[i]))
         
-        # Update timers
-        timeElapsed = time.time() - startTime
-        # timer = time.time() - timeRequest
+        # # Update timers
+        # timeElapsed = time.time() - startTime
+        # # timer = time.time() - timeRequest
         
         # # Request Ephemeris Data
         # if sirf and timer > 1:
@@ -213,6 +221,17 @@ def main():
     
     # Switch back to NMEA
     print 'Reverting to NMEA mode...'
+    ports = []
+    for c in coms:
+        p = serial.Serial(c, 115200)
+        if '2.7' in ver:
+            p.flushInput()
+            p.flushOutput()
+        elif '3.0' in ver:
+            p.reset_input_buffer()
+            p.reset_output_buffer()
+        ports.append(p)
+    
     for p in ports:
         # sirf = True
         portWrite(p, 'A0A20018810201010001010105010101000100010001000100012580013AB0B3', True)
@@ -238,9 +257,9 @@ def main():
     for p in ports:
         p.close()
     
-    # Close files
-    for f in files:
-        f.close()
+    # # Close files
+    # for f in files:
+        # f.close()
 
 if __name__ == '__main__':
     main()
