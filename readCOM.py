@@ -1,13 +1,10 @@
 # Import libraries
 import argparse
 import binascii
-import os
 import platform
 import serial
+import threading
 import time
-
-# Global variables
-ver = serial.VERSION
 
 # Get arguments
 def getArguments():
@@ -15,81 +12,87 @@ def getArguments():
     parser.add_argument('file',
                         action = 'store',
                         help   = 'Data file to parse')
+    parser.add_argument('baud',
+                        action = 'store',
+                        help   = 'Serial port baud rate')
     parser.add_argument('time',
                         action = 'store',
                         help   = 'Recording time')
     return parser.parse_args()
 
-# Read from port
-def portRead(port, sirf):
-    if '2.7' in ver:
-        while port.inWaiting() == 0:
+# Reader
+def reader(port, t):
+    timeElapsed = 0
+    startTime = time.time()
+    while timeElapsed < t:
+        # try:
+        data = format(int(binascii.hexlify(port.read()), 16), '02x')
+        buffer.append(data)
+        # except:
+            # pass
+        timeElapsed = time.time() - startTime
+    # print 'Reader done', len(buffer)
+
+# Writer
+def writer(fid, t):
+    timeElapsed = 0
+    startTime = time.time()
+    while timeElapsed < t or buffer:
+    # while timeElapsed < t:
+        # print len(buffer)
+        try:
+            temp = buffer.pop(0)
+            fid.write(temp)
+        except:
             pass
-    elif '3.0' in ver:
-        while port.in_waiting == 0:
-            pass
-    if sirf:
-        return format(int(binascii.hexlify(port.read()), 16), '02x')
-    else:
-        return port.read()
+        timeElapsed = time.time() - startTime
+    # print 'Writer done', len(buffer)
 
 # Main function
 def main():
-    # Declare global variables
-    global ver
+    # Get arguments
+    args = getArguments()
     
     # Get OS platform
     sys = platform.system()
     
-    # Get arguments
-    args = getArguments()
-    
     # Open file
     f = open(args.file, 'ab')
+    
+    # Open port
+    baud = int(args.baud)
     temp = args.file.split('_')[2]
     c = temp.split('.')[0]
-    p = serial.Serial(c, 115200)
-    if '2.7' in ver:
-        p.flushInput()
-        p.flushOutput()
-    elif '3.0' in ver:
-        p.reset_input_buffer()
-        p.reset_output_buffer()
+    if sys == 'Linux':
+        c = '/dev/' + c
+    p = serial.Serial(c, baud)
+    p.reset_input_buffer()
+    p.reset_output_buffer()
     
+    # # Log data
+    # t = int(args.time)
+    # timeElapsed = 0
+    # startTime = time.time()
+    # while timeElapsed < t:
+        # f.write(format(int(binascii.hexlify(p.read()), 16), '02x'))
+        # timeElapsed = time.time() - startTime
+    
+    # Create threads
+    global buffer
+    buffer = []
     t = int(args.time)
-    startTime = time.time()
-    timeElapsed = 0
-    while timeElapsed < t:
-        # Find start of message
-        while os.stat(f.name).st_size == 0:
-            data = portRead(p, True)
-            if data != 'a0':
-                continue
-            prev = data
-            data = portRead(p, True)
-            if data != 'a2':
-                continue
-            f.write(prev + ' ' + data + ' ')
-            f.flush()
-            os.fsync(f)
-            break
-        
-        data = portRead(p, True)
-        f.write(data + ' ')
-        
-        # Find end of message
-        while data == 'b0':
-            data = portRead(p, True)
-            f.write(data + ' ')
-            if data != 'b3':
-                continue
-            data = portRead(p, True)
-            if data == 'a0':
-                f.write('\r\n')
-            f.write(data + ' ')
-        
-        # Update timers
-        timeElapsed = time.time() - startTime
+    jobs = []
+    jobs.append(threading.Thread(target = reader, args = (p, t)))
+    jobs.append(threading.Thread(target = writer, args = (f, t)))
+    
+    # Log data
+    for j in jobs:
+        j.start()
+    for j in jobs:
+        j.join()
+    
+    # Close port
+    p.close()
     
     # Close file
     f.close()
